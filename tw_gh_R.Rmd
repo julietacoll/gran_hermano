@@ -1,0 +1,116 @@
+---
+title: "Scraping tweets sobre Gran Hermano Argentina"
+author: "Julieta"
+date: "2023-02-17"
+output: html_document
+---
+
+### Código utilizado para hacer scraping de datos sobre Gran Hermano Argentina en Twitter
+
+```{r setup, include=TRUE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## Importo librerías
+library(rtweet) 
+library(tokenizers)
+library(dplyr) 
+library(tidyverse)
+library(stringr)
+library(writexl)
+
+
+## Selecciono los hashtags que voy a buscar
+hashtags<-c("#GranHermano", "#GH2022", "#GH22", "#GH2023", "#GH23")
+hashtags <- paste(hashtags, collapse=" OR ")
+
+```
+
+
+```{r importo, include=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+## Busco tweets
+auth <- rtweet_app("COMPLETO CON EL TOKEN")
+tw <- search_tweets(hashtags, n=100000, include_rts = FALSE, retryonratelimit = TRUE, token=auth)
+
+``` 
+
+
+```{r limpio, include=TRUE, warning=FALSE, message=FALSE}
+
+## Elimino tildes y paso todos los tweets a minúscula en una nueva columna
+tw$copia_text<-chartr("áéíóú", "aeiou", tolower(tw$text))
+## Tokenizo la nueva columna para poder extraer los nombres dentro del tweet
+tw$copia_text<-tokenize_words(tw$copia_text)
+
+## Creo una variable con los nombres y apodos de todos los participantes que voy a buscr dentro del tweet
+participantes<-c("romina", "alfa", "julieta", "marcos", "primo", "nacho", "daniela", "pestañela", "vengañela", "camila", "ariel", "tora", "lucila", "frodo", "agustin", "holder", "martina", "mora", "maxi", "alexis", "conejo", "cone", "coti", "cata", "juan", "thiago", "juliana", "tini", "maria laura", "constanza", "romi", "big ari", "ari")
+
+## Para poner los nombres de los participantes en una nueva columna, pongo la posición de los nombres y apodos de los participantes haciendo match entre la variable participantes y el contenido del tweet tokenizado 
+for (i in seq_along(tw$copia_text)){
+  #pongo la posición del valor mencionado de participantes
+  tw$nombres[[i]]<-ifelse(tw$copia_text[[i]] %in% participantes, 
+                         match(tw$copia_text[[i]],participantes),
+                         "")
+  #elimino output de else
+  tw$nombres[[i]]<- tw$nombres[[i]][!tw$nombres[[i]]==""]
+  #elimino nombres duplicados
+  tw$nombres[[i]]<-tw$nombres[[i]][!duplicated(tw$nombres[[i]])]
+}
+
+## Creo la variable con las posiciones y los nombres correspondientes
+reemplazos <- c(
+  "33"="Ariel",
+  "32"= "Ariel",
+  "31"="Romina",
+  "30"="Coti",  
+  "29"="Cata", 
+  "28"="Juliana", 
+  "27"="Juliana",
+  "26"="Thiago", 
+  "25"="Juan", 
+  "24"="Cata", 
+  "23"="Coti", 
+  "22"="Conejo", 
+  "21"="Conejo", 
+  "20"="Conejo", 
+  "19"="Maxi", 
+  "18"="Mora", 
+  "17"="Martina", 
+  "16"="Holder", 
+  "15"="Agustin", 
+  "14"="Agustin", 
+  "13"="Tora", 
+  "12"="Tora", 
+  "11"="Ariel", 
+  "10"="Camila",
+  "9"="Daniela",
+  "8"="Daniela",
+  "7"="Daniela",   
+  "6"="Nacho", 
+  "5"="Marcos",
+  "4"="Marcos",
+  "3"="Julieta",
+  "2"="Alfa",
+  "1"="Romina")
+
+## Reemplazo la posición de los apodos con los nombres correspondientes
+tw$nombres <- str_replace_all(tw$nombres, reemplazos)
+
+## Elimino caracteres de los nombres
+tw$nombres <- str_replace_all(tw$nombres, "c\\(", "")
+tw$nombres <- str_replace_all(tw$nombres, "\\)", "")
+tw$nombres <- str_replace_all(tw$nombres, ",", " ")
+
+## Pongo NA donde no hay nombres de participantes 
+tw$nombres[tw$nombres=="character(0"]<-NA
+tw$nombres <- str_replace_all(tw$nombres, '\\"', "")
+
+## Elimino columnas que no voy a usar
+names(tw)
+tw<-tw[,-21:-44]
+tw<-tw[,-5:-18]
+tw<-tw[,-3]
+
+## Exporto los datos en excel
+write_xlsx(tw, paste("C:\\Users\\Julieta Coll\\Documents\\Portfolio\\tweets_gh", Sys.Date(), ".xlsx"))
+
+```
